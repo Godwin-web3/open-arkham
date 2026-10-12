@@ -1,9 +1,10 @@
-// Multi-chain portfolio with USD, labels, transfers, and top counterparties.
-// Public RPCs + CoinGecko + eth-labels.
+// Multi-chain portfolio with USD, labels, transfers, counterparties, and flow summary.
+// Public RPCs + CoinGecko + open labels.
 
 import { initLabels, lookupLabel } from './labels.js';
 import { getRecentTransfers } from './transfers.js';
 import { getTopCounterparties } from './counterparties.js';
+import { printFlowGraph } from './graph.js';
 
 const CHAINS = {
   ethereum: {
@@ -121,6 +122,8 @@ async function main() {
             console.log(`    ${name}  (${c.count} transfers)`);
           }
         }
+
+        printFlowGraph(transfers, address);
       }
     } catch (e) {
       console.log(`  error: ${e.message}`);
