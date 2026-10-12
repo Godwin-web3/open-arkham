@@ -1,5 +1,5 @@
 // Recent ERC-20 Transfer events via public RPC eth_getLogs.
-// No API key. Limited to recent blocks to stay within free RPC limits.
+// Scans a wider recent window. Falls back gracefully on limits.
 
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
@@ -15,31 +15,34 @@ async function rpcCall(rpc, method, params) {
   return data.result;
 }
 
-export async function getRecentTransfers(rpc, address, fromBlock = 'latest') {
-  const padded = address.toLowerCase().replace('0x', '').padStart(64, '0');
-  const fromTopic = '0x' + padded;
-  const toTopic = '0x' + padded;
-
+export async function getRecentTransfers(rpc, address) {
   try {
+    const latestHex = await rpcCall(rpc, 'eth_blockNumber', []);
+    const latest = parseInt(latestHex, 16);
+    const fromBlock = Math.max(0, latest - 50000); // wider window ~50k blocks
+
+    const padded = address.toLowerCase().replace('0x', '').padStart(64, '0');
+    const fromTopic = '0x' + padded;
+    const toTopic = '0x' + padded;
+
     const logs = await rpcCall(rpc, 'eth_getLogs', [{
-      fromBlock: '0x' + (parseInt(fromBlock, 16) - 10000).toString(16), // last ~10k blocks
+      fromBlock: '0x' + fromBlock.toString(16),
       toBlock: 'latest',
-      topics: [TRANSFER_TOPIC, null, null], // broad, then filter
+      topics: [TRANSFER_TOPIC],
     }]);
 
-    const relevant = logs.filter(log => 
-      log.topics[1] === fromTopic || log.topics[2] === toTopic
-    ).slice(0, 10); // limit output
+    const relevant = logs.filter(log =>
+      log.topics && (log.topics[1] === fromTopic || log.topics[2] === toTopic)
+    ).slice(0, 15);
 
     return relevant.map(log => ({
       txHash: log.transactionHash,
-      from: '0x' + log.topics[1].slice(26),
-      to: '0x' + log.topics[2].slice(26),
+      from: '0x' + (log.topics[1] || '').slice(26),
+      to: '0x' + (log.topics[2] || '').slice(26),
       token: log.address,
-      // value decoding omitted for brevity; raw data available
     }));
   } catch (e) {
-    console.log('Transfers unavailable on this RPC:', e.message);
+    console.log('  Transfers limited:', e.message);
     return [];
   }
 }
