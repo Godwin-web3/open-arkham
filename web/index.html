@@ -5,23 +5,39 @@
   <title>Open Arkham</title>
   <style>
     body { font-family: system-ui; max-width: 800px; margin: 2rem auto; }
-    input { width: 100%; padding: 0.5rem; }
-    pre { background: #f5f5f5; padding: 1rem; overflow: auto; }
+    input, button { padding: 0.5rem; }
+    input { width: 70%; }
+    pre { background: #f5f5f5; padding: 1rem; overflow: auto; white-space: pre-wrap; }
   </style>
 </head>
 <body>
   <h1>Open Arkham</h1>
-  <p>Free portfolio view from public RPCs, CoinGecko, and open labels. No proprietary data.</p>
+  <p>Free portfolio view from public RPCs and open labels. No proprietary data.</p>
   <input id="addr" placeholder="0x address" />
   <button onclick="run()">Check</button>
   <pre id="out">Enter an address.</pre>
   <script type="module">
-    // Minimal client-side version of the CLI logic.
-    // CORS must allow the public endpoints.
-
     const CHAINS = {
-      ethereum: { rpc: 'https://ethereum-rpc.publicnode.com', native: 'ETH' },
-      base: { rpc: 'https://base-rpc.publicnode.com', native: 'ETH' },
+      ethereum: {
+        rpc: 'https://ethereum-rpc.publicnode.com',
+        native: 'ETH',
+        tokens: {
+          USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+          WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+        },
+      },
+      base: {
+        rpc: 'https://base-rpc.publicnode.com',
+        native: 'ETH',
+        tokens: {
+          USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        },
+      },
+    };
+
+    const LOCAL_LABELS = {
+      '0xd8da6bf26964af9d7eed9e03e53415d37aa96045': 'Vitalik Buterin',
+      '0x28c6c06298d514db089934071355e5743bf21d60': 'Binance',
     };
 
     async function rpc(rpcUrl, method, params) {
@@ -40,21 +56,42 @@
       return Number(wei) / 1e18;
     }
 
+    async function getToken(rpcUrl, token, holder) {
+      const data = '0x70a08231' + holder.slice(2).padStart(64, '0');
+      const result = await rpc(rpcUrl, 'eth_call', [{ to: token, data }, 'latest']);
+      if (!result || result === '0x') return 0;
+      const raw = BigInt(result);
+      const decimals = token.toLowerCase().includes('a0b86991') || token.toLowerCase().includes('833589') ? 6 : 18;
+      return Number(raw) / 10 ** decimals;
+    }
+
+    function getLabel(addr) {
+      return LOCAL_LABELS[addr.toLowerCase()] || null;
+    }
+
     window.run = async () => {
       const address = document.getElementById('addr').value.trim();
       const out = document.getElementById('out');
       if (!address.startsWith('0x')) { out.textContent = 'Invalid address'; return; }
       out.textContent = 'Loading...';
-      let text = `Portfolio for ${address}\n\n`;
+      const label = getLabel(address);
+      let text = `Portfolio for ${address}${label ? ' (' + label + ')' : ''}\n\n`;
+
       for (const [name, chain] of Object.entries(CHAINS)) {
+        text += `${name.toUpperCase()}\n`;
         try {
-          const bal = await getNative(chain.rpc, address);
-          text += `${name}: ${bal.toFixed(6)} ${chain.native}\n`;
+          const native = await getNative(chain.rpc, address);
+          text += `  Native: ${native.toFixed(6)} ${chain.native}\n`;
+          for (const [sym, token] of Object.entries(chain.tokens)) {
+            const bal = await getToken(chain.rpc, token, address);
+            if (bal > 0) text += `  ${sym}: ${bal.toFixed(4)}\n`;
+          }
         } catch (e) {
-          text += `${name}: error\n`;
+          text += `  error\n`;
         }
+        text += '\n';
       }
-      text += '\n(Full labels, tokens, transfers coming. Same public sources as the CLI.)';
+      text += '(Labels from local open set. Transfers and full datasets next.)';
       out.textContent = text;
     };
   </script>
