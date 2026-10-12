@@ -18,23 +18,23 @@ Not a clone of Arkham's Ultra entity engine. Public sources cover known exchange
 
 - Balances: public RPCs (publicnode) via eth_getBalance and ERC-20 balanceOf.
 - Prices: CoinGecko free simple price endpoint.
-- Labels: eth-labels (raw JSON) and wallet-attribution. Loaded at runtime when available.
-- Transactions: next.
+- Labels: eth-labels raw JSON (runtime) + local fallback.
+- Transfers: public RPC eth_getLogs for recent ERC-20 Transfer events.
 
 ## Current scope
 
 - Multi-chain native + common ERC-20 balances.
 - USD values from CoinGecko.
 - Approximate total USD.
-- Dynamic open label lookup (eth-labels + local fallback).
-- Label shown next to the queried address if known.
+- Dynamic open label lookup.
+- Recent transfers with label overlay on from/to addresses.
 
 ## Next
 
-- Overlay labels on counterparties once transfers are added.
-- Recent transfers from free explorer endpoints.
-- Counterparty aggregation.
-- Graph view.
+- Aggregate top counterparties from the transfer list.
+- Expand label coverage with wallet-attribution CSVs.
+- Graph view of flows.
+- Solana/Bitcoin support.
 
 ## Run
 
@@ -44,4 +44,4 @@ node src/check-balances.js 0xYourAddress
 
 Requires Node 18+.
 
-The label loader tries the public eth-labels JSON. If the raw URL changes or is rate-limited, it falls back to the local set.
+Transfers are limited to recent blocks and may be empty on rate-limited RPCs. Labels appear when the open dataset contains the address.

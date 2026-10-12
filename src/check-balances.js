@@ -1,7 +1,8 @@
-// Multi-chain portfolio with USD values and open labels.
+// Multi-chain portfolio with USD values, open labels, and recent transfers.
 // Public RPCs + CoinGecko + eth-labels.
 
 import { initLabels, lookupLabel } from './labels.js';
+import { getRecentTransfers } from './transfers.js';
 
 const CHAINS = {
   ethereum: {
@@ -99,6 +100,17 @@ async function main() {
           const usd = bal * (prices[token.coingecko] || 0);
           totalUsd += usd;
           console.log(`  ${symbol}: ${bal.toFixed(4)}  ($${usd.toFixed(2)})`);
+        }
+      }
+
+      // Recent transfers
+      const transfers = await getRecentTransfers(chain.rpc, address);
+      if (transfers.length) {
+        console.log('  Recent transfers:');
+        for (const t of transfers) {
+          const fromLabel = lookupLabel(t.from) || t.from.slice(0, 8);
+          const toLabel = lookupLabel(t.to) || t.to.slice(0, 8);
+          console.log(`    ${fromLabel} -> ${toLabel}  (${t.token.slice(0, 8)}...)`);
         }
       }
     } catch (e) {
