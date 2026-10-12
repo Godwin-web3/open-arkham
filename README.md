@@ -2,7 +2,7 @@
 
 Free open-source multi-chain portfolio and transaction tracker.
 
-Built from public RPCs, free price feeds, explorer APIs, and open label datasets.
+Built from public RPCs, free price feeds, and open label datasets.
 
 No proprietary intelligence. Every number comes from a source you can re-query.
 
@@ -16,25 +16,25 @@ Not a clone of Arkham's Ultra entity engine. Public sources cover known exchange
 
 ## Data sources
 
-- Balances: public RPCs (publicnode) via eth_getBalance and ERC-20 balanceOf.
-- Prices: CoinGecko free simple price endpoint.
-- Labels: eth-labels raw JSON (runtime) + local fallback.
-- Transfers: public RPC eth_getLogs for recent ERC-20 Transfer events.
+- Balances: public RPCs via eth_getBalance and ERC-20 balanceOf.
+- Prices: CoinGecko free endpoint.
+- Labels: eth-labels raw JSON + local fallback.
+- Transfers: public RPC eth_getLogs.
+- Counterparties: aggregated from the same transfer list.
 
 ## Current scope
 
-- Multi-chain native + common ERC-20 balances.
-- USD values from CoinGecko.
-- Approximate total USD.
-- Dynamic open label lookup.
-- Recent transfers with label overlay on from/to addresses.
+- Multi-chain balances with USD values.
+- Dynamic open labels.
+- Recent transfers with labels on from/to.
+- Top counterparties by transfer count with labels.
 
 ## Next
 
-- Aggregate top counterparties from the transfer list.
-- Expand label coverage with wallet-attribution CSVs.
+- Expand label coverage with wallet-attribution.
 - Graph view of flows.
-- Solana/Bitcoin support.
+- Wider block range or explorer fallback for transfers.
+- Solana and Bitcoin.
 
 ## Run
 
@@ -44,4 +44,4 @@ node src/check-balances.js 0xYourAddress
 
 Requires Node 18+.
 
-Transfers are limited to recent blocks and may be empty on rate-limited RPCs. Labels appear when the open dataset contains the address.
+Transfers and counterparties depend on recent activity and free RPC log limits. Labels appear only when the address exists in the open datasets.
