@@ -1,5 +1,7 @@
-// Multi-chain native + common ERC-20 balances with USD values.
-// Public RPCs + CoinGecko free price endpoint. No API keys required.
+// Multi-chain portfolio with USD values and open labels.
+// Public RPCs + CoinGecko + eth-labels.
+
+import { initLabels, lookupLabel } from './labels.js';
 
 const CHAINS = {
   ethereum: {
@@ -75,8 +77,12 @@ async function main() {
     process.exit(1);
   }
 
+  await initLabels();
+  const label = lookupLabel(address);
+  const labelText = label ? ` (${label})` : '';
+
   const prices = await getPrices();
-  console.log(`Portfolio for ${address}\n`);
+  console.log(`Portfolio for ${address}${labelText}\n`);
   let totalUsd = 0;
 
   for (const [name, chain] of Object.entries(CHAINS)) {
