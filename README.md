@@ -16,23 +16,24 @@ Not a clone of Arkham's Ultra entity engine. Public sources cover known exchange
 
 ## Data sources
 
-- Balances: public RPCs (publicnode, ankr, etc.) via standard eth_getBalance and ERC-20 balanceOf.
-- Prices: CoinGecko free tier or DefiLlama.
-- Transactions: Etherscan free API (rate limited), Blockscout, or Solscan free.
-- Labels: eth-labels, wallet-attribution, GraphSense TagPacks, OFAC lists. All open.
+- Balances: public RPCs (publicnode) via eth_getBalance and ERC-20 balanceOf.
+- Prices: CoinGecko free tier or DefiLlama (next).
+- Transactions: Etherscan free API or Blockscout (next).
+- Labels: eth-labels, wallet-attribution, GraphSense, OFAC. Local lookup stub included.
 
 ## Current scope
 
-- Multi-chain native + common token balances for EVM chains.
-- Basic label lookup from local open datasets.
-- Transaction list for one address (explorer API).
+- Multi-chain native balances.
+- Common ERC-20 balances (USDC, USDT, WETH) on Ethereum, Base, Arbitrum.
+- Basic label lookup stub.
 
 ## Next
 
-- Ingest open label CSVs.
-- Counterparty aggregation.
+- Ingest real open label CSVs.
+- Transaction history from free explorer endpoints.
+- Counterparty aggregation with labels.
 - Simple graph view.
-- Solana and Bitcoin support.
+- Price feeds for USD totals.
 
 ## Run
 
