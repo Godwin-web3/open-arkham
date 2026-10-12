@@ -1,5 +1,5 @@
-// Multi-chain portfolio with USD, labels, transfers (RPC + Blockscout), counterparties, flows.
-// Public sources only.
+// Multi-chain portfolio with USD, open labels, transfers, counterparties and flow summary.
+// Public RPCs + CoinGecko + eth-labels + Blockscout fallback.
 
 import { initLabels, lookupLabel } from './labels.js';
 import { getRecentTransfers } from './transfers.js';
@@ -13,6 +13,7 @@ const CHAINS = {
     tokens: {
       USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, coingecko: 'usd-coin' },
       USDT: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, coingecko: 'tether' },
+      DAI: { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', decimals: 18, coingecko: 'dai' },
       WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, coingecko: 'weth' },
     },
   },
@@ -31,6 +32,15 @@ const CHAINS = {
       USDC: { address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, coingecko: 'usd-coin' },
       USDT: { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6, coingecko: 'tether' },
       WETH: { address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', decimals: 18, coingecko: 'weth' },
+    },
+  },
+  optimism: {
+    rpc: 'https://optimism-rpc.publicnode.com',
+    native: { symbol: 'ETH', coingecko: 'ethereum' },
+    tokens: {
+      USDC: { address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', decimals: 6, coingecko: 'usd-coin' },
+      USDT: { address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58', decimals: 6, coingecko: 'tether' },
+      WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18, coingecko: 'weth' },
     },
   },
 };
@@ -61,7 +71,7 @@ async function getTokenBalance(rpc, tokenAddress, holder, decimals) {
 }
 
 async function getPrices() {
-  const ids = 'ethereum,usd-coin,tether,weth';
+  const ids = 'ethereum,usd-coin,tether,dai,weth';
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
   const res = await fetch(url);
   const data = await res.json();
@@ -69,6 +79,7 @@ async function getPrices() {
     ethereum: data.ethereum?.usd || 0,
     'usd-coin': data['usd-coin']?.usd || 1,
     tether: data.tether?.usd || 1,
+    dai: data.dai?.usd || 1,
     weth: data.weth?.usd || data.ethereum?.usd || 0,
   };
 }
@@ -92,7 +103,7 @@ async function main() {
     console.log(`\n${name.toUpperCase()}`);
     try {
       const nativeBal = await getNativeBalance(chain.rpc, address);
-      const nativeUsd = nativeBal * prices[chain.native.coingecko];
+      const nativeUsd = nativeBal * (prices[chain.native.coingecko] || 0);
       totalUsd += nativeUsd;
       console.log(`  Native: ${nativeBal.toFixed(6)} ${chain.native.symbol}  ($${nativeUsd.toFixed(2)})`);
 

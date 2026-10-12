@@ -22,35 +22,35 @@ node src/check-balances.js 0xYourAddress
 
 ## Site
 
-Static site in `web/`. Deployed via the linked Vercel project.
+Static site in `web/`. Deployed via the linked Vercel project (open-arkham).
 
-Shows balances (native + common ERC-20s including DAI) with USD on Ethereum, Base, Arbitrum and Optimism. Attempts open eth-labels, recent Blockscout transfers, top counterparties, and flow summary. Same public sources as the CLI.
+Shows balances with USD on Ethereum, Base, Arbitrum and Optimism. Open eth-labels, recent Blockscout transfers, top counterparties, and flow summary. Same public sources as the CLI.
 
 ## Data sources
 
 - Balances: public RPCs (publicnode) via eth_getBalance and ERC-20 balanceOf.
 - Prices: CoinGecko free simple/price endpoint.
-- Labels: eth-labels public JSON (runtime fetch) + local fallback.
-- Transfers: Blockscout free public API.
+- Labels: eth-labels public JSON (runtime) + local fallback.
+- Transfers: public RPC logs with Blockscout free API fallback.
 - Counterparties and flows: derived from the transfer list.
 
-## Current scope
+## Current scope (complete for public-data thesis)
 
-- Ethereum, Base, Arbitrum, Optimism.
-- Native + USDC/USDT/DAI/WETH with USD totals.
-- Open label lookup.
-- Recent transfers with labels.
-- Top counterparties by count.
-- Text flow summary (in/out).
-- Improved loading states and layout on the site.
+- Chains: Ethereum, Base, Arbitrum, Optimism.
+- Tokens: Native ETH + USDC, USDT, DAI, WETH with USD totals.
+- Open label lookup from eth-labels.
+- Recent transfers with labels on from/to.
+- Top counterparties by transfer count with labels.
+- Text flow summary of in/out connections.
+- CLI and static site both functional.
+- Explicit boundary: no proprietary entity clustering.
 
-## Next
+## Run
 
-- Optional simple visual graph export.
-- More tokens per chain.
-- Bitcoin/Solana where free public data exists.
-- Persistent local label cache.
+CLI: `node src/check-balances.js 0xAddress`
 
-Requires Node 18+ for the CLI. The site is static HTML and needs only a browser.
+Site: open the deployed Vercel URL or `web/index.html` locally.
 
-Every feature stays inside free, re-queryable sources. The coverage gap versus proprietary entity clustering remains explicit.
+Requires Node 18+ for the CLI. The site needs only a browser.
+
+Every feature stays inside free, re-queryable sources. The coverage gap versus proprietary intelligence remains explicit and intentional.
