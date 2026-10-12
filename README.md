@@ -2,9 +2,17 @@
 
 Free open-source multi-chain portfolio and transaction tracker.
 
-Built from public RPCs, free price feeds, open label datasets, and free explorer fallbacks.
+Built from public RPCs, free price feeds, open label datasets, and free explorer APIs.
 
 No proprietary intelligence. Every number comes from a source you can re-query.
+
+## What this is
+
+A portfolio view of any address across chains. Holdings with USD value, recent transfers, known public labels, top counterparties, and a simple flow summary.
+
+## What this is not
+
+Not a clone of Arkham's Ultra entity engine. Public sources cover known exchange wallets, sanctioned addresses, major protocols, and some high-profile individuals. They do not cover most deposit addresses or deep off-chain linking.
 
 ## CLI
 
@@ -14,26 +22,34 @@ node src/check-balances.js 0xYourAddress
 
 ## Site
 
-Static files in `web/`. Deployed at the Vercel project linked to this repo.
+Static site in `web/`. Deployed via the linked Vercel project.
 
-The site shows native and token balances with USD values, attempts to load open eth-labels, and fetches recent transfers from Blockscout public APIs. Same sources as the CLI. CORS on the public endpoints determines what loads in the browser.
+Shows balances (native + common ERC-20s) with USD, attempts open eth-labels, recent Blockscout transfers, top counterparties, and flow summary. Same public sources as the CLI.
 
 ## Data sources
 
-- Balances: public RPCs.
-- Prices: CoinGecko free endpoint.
-- Labels: eth-labels (attempted remote) + local fallback.
-- Transfers: Blockscout free API.
+- Balances: public RPCs (publicnode) via eth_getBalance and ERC-20 balanceOf.
+- Prices: CoinGecko free simple/price endpoint.
+- Labels: eth-labels public JSON (runtime fetch) + local fallback.
+- Transfers: Blockscout free public API.
+- Counterparties and flows: derived from the transfer list.
 
 ## Current scope
 
-- CLI: full feature set.
-- Site: balances with USD, label attempt, recent transfers.
+- CLI and site both cover Ethereum, Base, Arbitrum.
+- Native + USDC/USDT/WETH with USD totals.
+- Open label lookup.
+- Recent transfers with labels.
+- Top counterparties by count.
+- Text flow summary (in/out).
 
 ## Next
 
-- Improve label coverage and error handling on the site.
-- Add counterparties and flow summary to the page.
-- More chains.
+- More tokens and chains.
+- Better error handling and loading states.
+- Optional simple visual graph.
+- Bitcoin/Solana where free public data exists.
 
-Requires Node 18+ for CLI. Site is static and needs only a browser.
+Requires Node 18+ for the CLI. The site is static HTML and needs only a browser.
+
+Every feature stays inside free, re-queryable sources. The coverage gap versus proprietary entity clustering remains explicit.

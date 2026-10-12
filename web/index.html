@@ -4,18 +4,21 @@
   <meta charset="utf-8">
   <title>Open Arkham</title>
   <style>
-    body { font-family: system-ui; max-width: 800px; margin: 2rem auto; }
-    input, button { padding: 0.5rem; }
-    input { width: 70%; }
-    pre { background: #f5f5f5; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+    body { font-family: system-ui; max-width: 900px; margin: 2rem auto; line-height: 1.4; }
+    input, button { padding: 0.6rem; font-size: 1rem; }
+    input { width: 65%; }
+    button { margin-left: 0.5rem; }
+    pre { background: #f6f8fa; padding: 1.2rem; overflow: auto; white-space: pre-wrap; border-radius: 6px; }
+    .note { color: #666; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <h1>Open Arkham</h1>
-  <p>Free portfolio view from public RPCs, CoinGecko, open labels, and Blockscout. No proprietary data.</p>
+  <p>Free portfolio, transfers, counterparties and flows from public RPCs, CoinGecko, open labels and Blockscout. No proprietary data.</p>
   <input id="addr" placeholder="0x address" />
   <button onclick="run()">Check</button>
   <pre id="out">Enter an address.</pre>
+  <p class="note">Labels from eth-labels where CORS allows. Transfers from Blockscout. All numbers re-queryable.</p>
   <script type="module">
     const CHAINS = {
       ethereum: {
@@ -23,6 +26,7 @@
         native: { symbol: 'ETH', id: 'ethereum' },
         tokens: {
           USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, id: 'usd-coin' },
+          USDT: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, id: 'tether' },
           WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, id: 'weth' },
         },
         blockscout: 'https://eth.blockscout.com/api',
@@ -32,8 +36,19 @@
         native: { symbol: 'ETH', id: 'ethereum' },
         tokens: {
           USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, id: 'usd-coin' },
+          WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18, id: 'weth' },
         },
         blockscout: 'https://base.blockscout.com/api',
+      },
+      arbitrum: {
+        rpc: 'https://arbitrum-one-rpc.publicnode.com',
+        native: { symbol: 'ETH', id: 'ethereum' },
+        tokens: {
+          USDC: { address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, id: 'usd-coin' },
+          USDT: { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6, id: 'tether' },
+          WETH: { address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', decimals: 18, id: 'weth' },
+        },
+        blockscout: 'https://arbitrum.blockscout.com/api',
       },
     };
 
@@ -44,15 +59,15 @@
         const res = await fetch('https://raw.githubusercontent.com/dawsbot/eth-labels/v1/data/json/accounts.json');
         if (res.ok) {
           const accounts = await res.json();
-          for (const acc of accounts.slice(0, 5000)) { // limit for browser
+          for (const acc of (accounts || []).slice(0, 8000)) {
             if (acc.address && acc.nameTag) labelMap.set(acc.address.toLowerCase(), acc.nameTag);
           }
         }
       } catch {}
-      // local fallback already handled in getLabel
     }
 
     function getLabel(addr) {
+      if (!addr) return null;
       return labelMap.get(addr.toLowerCase()) || null;
     }
 
@@ -81,23 +96,24 @@
     }
 
     async function getPrices() {
-      const ids = 'ethereum,usd-coin,weth';
+      const ids = 'ethereum,usd-coin,tether,weth';
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
       const data = await res.json();
       return {
         ethereum: data.ethereum?.usd || 0,
         'usd-coin': data['usd-coin']?.usd || 1,
+        tether: data.tether?.usd || 1,
         weth: data.weth?.usd || data.ethereum?.usd || 0,
       };
     }
 
     async function getTransfers(blockscout, address) {
       try {
-        const url = `${blockscout}?module=account&action=tokentx&address=${address}&page=1&offset=5&sort=desc`;
+        const url = `${blockscout}?module=account&action=tokentx&address=${address}&page=1&offset=10&sort=desc`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.status !== '1' || !data.result) return [];
-        return data.result.slice(0, 5).map(tx => ({
+        return data.result.slice(0, 10).map(tx => ({
           from: tx.from,
           to: tx.to,
           token: tx.contractAddress,
@@ -107,11 +123,41 @@
       }
     }
 
+    function getTopCounterparties(transfers, own) {
+      const counts = new Map();
+      const ownL = own.toLowerCase();
+      for (const t of transfers) {
+        const other = (t.from || '').toLowerCase() === ownL ? t.to : t.from;
+        if (!other || other.toLowerCase() === ownL) continue;
+        counts.set(other, (counts.get(other) || 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([addr, count]) => ({ address: addr, count, label: getLabel(addr) }));
+    }
+
+    function flowSummary(transfers, own) {
+      const ownL = own.toLowerCase();
+      const edges = new Set();
+      for (const t of transfers) {
+        const from = (t.from || '').toLowerCase();
+        const to = (t.to || '').toLowerCase();
+        if (from === ownL || to === ownL) {
+          const other = from === ownL ? to : from;
+          const dir = from === ownL ? 'out' : 'in';
+          const label = getLabel(other) || other.slice(0, 10);
+          edges.add(`${dir} -> ${label}`);
+        }
+      }
+      return Array.from(edges);
+    }
+
     window.run = async () => {
       const address = document.getElementById('addr').value.trim();
       const out = document.getElementById('out');
       if (!address.startsWith('0x')) { out.textContent = 'Invalid address'; return; }
-      out.textContent = 'Loading...';
+      out.textContent = 'Loading labels, balances, prices, transfers...';
       await loadLabels();
       const prices = await getPrices();
       const label = getLabel(address);
@@ -122,7 +168,7 @@
         text += `${name.toUpperCase()}\n`;
         try {
           const native = await getNative(chain.rpc, address);
-          const nativeUsd = native * prices[chain.native.id];
+          const nativeUsd = native * (prices[chain.native.id] || 0);
           total += nativeUsd;
           text += `  Native: ${native.toFixed(6)} ${chain.native.symbol} ($${nativeUsd.toFixed(2)})\n`;
           for (const [sym, token] of Object.entries(chain.tokens)) {
@@ -137,18 +183,31 @@
           if (transfers.length) {
             text += '  Recent transfers:\n';
             for (const t of transfers) {
-              const fromL = getLabel(t.from) || t.from.slice(0, 8);
-              const toL = getLabel(t.to) || t.to.slice(0, 8);
+              const fromL = getLabel(t.from) || (t.from || '').slice(0, 8);
+              const toL = getLabel(t.to) || (t.to || '').slice(0, 8);
               text += `    ${fromL} -> ${toL}\n`;
+            }
+            const tops = getTopCounterparties(transfers, address);
+            if (tops.length) {
+              text += '  Top counterparties:\n';
+              for (const c of tops) {
+                const n = c.label || c.address.slice(0, 10);
+                text += `    ${n} (${c.count} transfers)\n`;
+              }
+            }
+            const flows = flowSummary(transfers, address);
+            if (flows.length) {
+              text += '  Flow summary:\n';
+              for (const f of flows) text += `    ${f}\n`;
             }
           }
         } catch (e) {
-          text += `  error\n`;
+          text += `  error: ${e.message}\n`;
         }
         text += '\n';
       }
       text += `Total USD (approx): $${total.toFixed(2)}\n`;
-      text += '(Labels from open eth-labels where CORS allows. Transfers from Blockscout.)';
+      text += '\nAll data from public RPCs, CoinGecko free API, eth-labels, and Blockscout. No proprietary intelligence.';
       out.textContent = text;
     };
   </script>
