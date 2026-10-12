@@ -12,7 +12,7 @@
 </head>
 <body>
   <h1>Open Arkham</h1>
-  <p>Free portfolio view from public RPCs, CoinGecko, and open labels. No proprietary data.</p>
+  <p>Free portfolio view from public RPCs, CoinGecko, open labels, and Blockscout. No proprietary data.</p>
   <input id="addr" placeholder="0x address" />
   <button onclick="run()">Check</button>
   <pre id="out">Enter an address.</pre>
@@ -25,6 +25,7 @@
           USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, id: 'usd-coin' },
           WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, id: 'weth' },
         },
+        blockscout: 'https://eth.blockscout.com/api',
       },
       base: {
         rpc: 'https://base-rpc.publicnode.com',
@@ -32,13 +33,28 @@
         tokens: {
           USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, id: 'usd-coin' },
         },
+        blockscout: 'https://base.blockscout.com/api',
       },
     };
 
-    const LOCAL_LABELS = {
-      '0xd8da6bf26964af9d7eed9e03e53415d37aa96045': 'Vitalik Buterin',
-      '0x28c6c06298d514db089934071355e5743bf21d60': 'Binance',
-    };
+    let labelMap = new Map();
+
+    async function loadLabels() {
+      try {
+        const res = await fetch('https://raw.githubusercontent.com/dawsbot/eth-labels/v1/data/json/accounts.json');
+        if (res.ok) {
+          const accounts = await res.json();
+          for (const acc of accounts.slice(0, 5000)) { // limit for browser
+            if (acc.address && acc.nameTag) labelMap.set(acc.address.toLowerCase(), acc.nameTag);
+          }
+        }
+      } catch {}
+      // local fallback already handled in getLabel
+    }
+
+    function getLabel(addr) {
+      return labelMap.get(addr.toLowerCase()) || null;
+    }
 
     async function rpc(rpcUrl, method, params) {
       const res = await fetch(rpcUrl, {
@@ -75,8 +91,20 @@
       };
     }
 
-    function getLabel(addr) {
-      return LOCAL_LABELS[addr.toLowerCase()] || null;
+    async function getTransfers(blockscout, address) {
+      try {
+        const url = `${blockscout}?module=account&action=tokentx&address=${address}&page=1&offset=5&sort=desc`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.status !== '1' || !data.result) return [];
+        return data.result.slice(0, 5).map(tx => ({
+          from: tx.from,
+          to: tx.to,
+          token: tx.contractAddress,
+        }));
+      } catch {
+        return [];
+      }
     }
 
     window.run = async () => {
@@ -84,6 +112,7 @@
       const out = document.getElementById('out');
       if (!address.startsWith('0x')) { out.textContent = 'Invalid address'; return; }
       out.textContent = 'Loading...';
+      await loadLabels();
       const prices = await getPrices();
       const label = getLabel(address);
       let text = `Portfolio for ${address}${label ? ' (' + label + ')' : ''}\n\n`;
@@ -104,13 +133,22 @@
               text += `  ${sym}: ${bal.toFixed(4)} ($${usd.toFixed(2)})\n`;
             }
           }
+          const transfers = await getTransfers(chain.blockscout, address);
+          if (transfers.length) {
+            text += '  Recent transfers:\n';
+            for (const t of transfers) {
+              const fromL = getLabel(t.from) || t.from.slice(0, 8);
+              const toL = getLabel(t.to) || t.to.slice(0, 8);
+              text += `    ${fromL} -> ${toL}\n`;
+            }
+          }
         } catch (e) {
           text += `  error\n`;
         }
         text += '\n';
       }
       text += `Total USD (approx): $${total.toFixed(2)}\n`;
-      text += '(Local labels. Remote datasets and transfers next where CORS allows.)';
+      text += '(Labels from open eth-labels where CORS allows. Transfers from Blockscout.)';
       out.textContent = text;
     };
   </script>
