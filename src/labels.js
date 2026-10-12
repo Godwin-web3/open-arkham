@@ -1,6 +1,5 @@
-// Open label lookup.
-// Loads from public datasets at runtime. Falls back to local examples.
-// Sources: eth-labels, wallet-attribution.
+// Open label lookup from multiple public sources.
+// eth-labels + wallet-attribution. Local fallback.
 
 const LOCAL = {
   '0xbe0eb53f46cd79a6e9b1c2c5b8c5c5c5c5c5c5c5': 'Binance Hot Wallet',
@@ -10,22 +9,52 @@ const LOCAL = {
 
 let labelMap = new Map(Object.entries(LOCAL));
 
-async function loadRemoteLabels() {
+async function loadFromUrl(url, parser) {
   try {
-    // Try eth-labels accounts JSON (example endpoint; adjust if needed)
-    const res = await fetch('https://raw.githubusercontent.com/dawsbot/eth-labels/v1/data/json/accounts.json');
-    if (res.ok) {
-      const accounts = await res.json();
+    const res = await fetch(url);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return parser(data);
+  } catch {
+    return 0;
+  }
+}
+
+async function loadRemoteLabels() {
+  let total = 0;
+
+  // eth-labels accounts
+  total += await loadFromUrl(
+    'https://raw.githubusercontent.com/dawsbot/eth-labels/v1/data/json/accounts.json',
+    (accounts) => {
+      let n = 0;
       for (const acc of accounts) {
         if (acc.address && acc.nameTag) {
           labelMap.set(acc.address.toLowerCase(), acc.nameTag);
+          n++;
         }
       }
-      console.log(`Loaded ${accounts.length} labels from eth-labels`);
+      return n;
     }
-  } catch (e) {
-    console.log('Remote labels unavailable, using local set');
-  }
+  );
+
+  // wallet-attribution ethereum (example; adjust path if needed)
+  total += await loadFromUrl(
+    'https://raw.githubusercontent.com/prettydeath/wallet-attribution/main/data/ethereum.json',
+    (rows) => {
+      let n = 0;
+      for (const row of rows) {
+        if (row.address && row.entity) {
+          labelMap.set(row.address.toLowerCase(), row.entity);
+          n++;
+        }
+      }
+      return n;
+    }
+  );
+
+  if (total > 0) console.log(`Loaded ${total} labels from public sources`);
+  else console.log('Using local label set');
 }
 
 export async function initLabels() {
