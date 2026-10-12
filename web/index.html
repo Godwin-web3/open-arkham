@@ -3,22 +3,28 @@
 <head>
   <meta charset="utf-8">
   <title>Open Arkham</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: system-ui; max-width: 900px; margin: 2rem auto; line-height: 1.4; }
-    input, button { padding: 0.6rem; font-size: 1rem; }
-    input { width: 65%; }
-    button { margin-left: 0.5rem; }
-    pre { background: #f6f8fa; padding: 1.2rem; overflow: auto; white-space: pre-wrap; border-radius: 6px; }
-    .note { color: #666; font-size: 0.9rem; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; line-height: 1.45; color: #222; }
+    h1 { margin-bottom: 0.3rem; }
+    .sub { color: #555; margin-top: 0; }
+    .row { display: flex; gap: 0.5rem; margin: 1rem 0; flex-wrap: wrap; }
+    input { flex: 1; min-width: 240px; padding: 0.7rem; font-size: 1rem; border: 1px solid #ccc; border-radius: 6px; }
+    button { padding: 0.7rem 1.2rem; font-size: 1rem; background: #111; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    pre { background: #f6f8fa; padding: 1.2rem; overflow: auto; white-space: pre-wrap; border-radius: 8px; border: 1px solid #e1e4e8; font-size: 0.92rem; }
+    .note { color: #666; font-size: 0.85rem; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
   <h1>Open Arkham</h1>
-  <p>Free portfolio, transfers, counterparties and flows from public RPCs, CoinGecko, open labels and Blockscout. No proprietary data.</p>
-  <input id="addr" placeholder="0x address" />
-  <button onclick="run()">Check</button>
-  <pre id="out">Enter an address.</pre>
-  <p class="note">Labels from eth-labels where CORS allows. Transfers from Blockscout. All numbers re-queryable.</p>
+  <p class="sub">Free open-source portfolio and flow view. Public RPCs, CoinGecko, eth-labels, Blockscout. No proprietary intelligence.</p>
+  <div class="row">
+    <input id="addr" placeholder="Paste 0x address" />
+    <button id="btn" onclick="run()">Check</button>
+  </div>
+  <pre id="out">Enter an address and click Check.</pre>
+  <p class="note">Every number is re-queryable from public sources. Coverage is limited to known open labels and free explorer data.</p>
   <script type="module">
     const CHAINS = {
       ethereum: {
@@ -27,6 +33,7 @@
         tokens: {
           USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, id: 'usd-coin' },
           USDT: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, id: 'tether' },
+          DAI: { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', decimals: 18, id: 'dai' },
           WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, id: 'weth' },
         },
         blockscout: 'https://eth.blockscout.com/api',
@@ -50,6 +57,16 @@
         },
         blockscout: 'https://arbitrum.blockscout.com/api',
       },
+      optimism: {
+        rpc: 'https://optimism-rpc.publicnode.com',
+        native: { symbol: 'ETH', id: 'ethereum' },
+        tokens: {
+          USDC: { address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85', decimals: 6, id: 'usd-coin' },
+          USDT: { address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58', decimals: 6, id: 'tether' },
+          WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18, id: 'weth' },
+        },
+        blockscout: 'https://optimism.blockscout.com/api',
+      },
     };
 
     let labelMap = new Map();
@@ -59,7 +76,7 @@
         const res = await fetch('https://raw.githubusercontent.com/dawsbot/eth-labels/v1/data/json/accounts.json');
         if (res.ok) {
           const accounts = await res.json();
-          for (const acc of (accounts || []).slice(0, 8000)) {
+          for (const acc of (accounts || []).slice(0, 10000)) {
             if (acc.address && acc.nameTag) labelMap.set(acc.address.toLowerCase(), acc.nameTag);
           }
         }
@@ -96,24 +113,26 @@
     }
 
     async function getPrices() {
-      const ids = 'ethereum,usd-coin,tether,weth';
+      const ids = 'ethereum,usd-coin,tether,dai,weth';
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
       const data = await res.json();
       return {
         ethereum: data.ethereum?.usd || 0,
         'usd-coin': data['usd-coin']?.usd || 1,
         tether: data.tether?.usd || 1,
+        dai: data.dai?.usd || 1,
         weth: data.weth?.usd || data.ethereum?.usd || 0,
       };
     }
 
     async function getTransfers(blockscout, address) {
+      if (!blockscout) return [];
       try {
-        const url = `${blockscout}?module=account&action=tokentx&address=${address}&page=1&offset=10&sort=desc`;
+        const url = `${blockscout}?module=account&action=tokentx&address=${address}&page=1&offset=8&sort=desc`;
         const res = await fetch(url);
         const data = await res.json();
         if (data.status !== '1' || !data.result) return [];
-        return data.result.slice(0, 10).map(tx => ({
+        return data.result.slice(0, 8).map(tx => ({
           from: tx.from,
           to: tx.to,
           token: tx.contractAddress,
@@ -156,59 +175,68 @@
     window.run = async () => {
       const address = document.getElementById('addr').value.trim();
       const out = document.getElementById('out');
-      if (!address.startsWith('0x')) { out.textContent = 'Invalid address'; return; }
-      out.textContent = 'Loading labels, balances, prices, transfers...';
-      await loadLabels();
-      const prices = await getPrices();
-      const label = getLabel(address);
-      let text = `Portfolio for ${address}${label ? ' (' + label + ')' : ''}\n\n`;
-      let total = 0;
+      const btn = document.getElementById('btn');
+      if (!address.startsWith('0x') || address.length < 42) {
+        out.textContent = 'Invalid address';
+        return;
+      }
+      btn.disabled = true;
+      out.textContent = 'Loading labels, prices, balances and transfers...';
+      try {
+        await loadLabels();
+        const prices = await getPrices();
+        const label = getLabel(address);
+        let text = `Portfolio for ${address}${label ? ' (' + label + ')' : ''}\n\n`;
+        let total = 0;
 
-      for (const [name, chain] of Object.entries(CHAINS)) {
-        text += `${name.toUpperCase()}\n`;
-        try {
-          const native = await getNative(chain.rpc, address);
-          const nativeUsd = native * (prices[chain.native.id] || 0);
-          total += nativeUsd;
-          text += `  Native: ${native.toFixed(6)} ${chain.native.symbol} ($${nativeUsd.toFixed(2)})\n`;
-          for (const [sym, token] of Object.entries(chain.tokens)) {
-            const bal = await getToken(chain.rpc, token.address, address, token.decimals);
-            if (bal > 0) {
-              const usd = bal * (prices[token.id] || 0);
-              total += usd;
-              text += `  ${sym}: ${bal.toFixed(4)} ($${usd.toFixed(2)})\n`;
-            }
-          }
-          const transfers = await getTransfers(chain.blockscout, address);
-          if (transfers.length) {
-            text += '  Recent transfers:\n';
-            for (const t of transfers) {
-              const fromL = getLabel(t.from) || (t.from || '').slice(0, 8);
-              const toL = getLabel(t.to) || (t.to || '').slice(0, 8);
-              text += `    ${fromL} -> ${toL}\n`;
-            }
-            const tops = getTopCounterparties(transfers, address);
-            if (tops.length) {
-              text += '  Top counterparties:\n';
-              for (const c of tops) {
-                const n = c.label || c.address.slice(0, 10);
-                text += `    ${n} (${c.count} transfers)\n`;
+        for (const [name, chain] of Object.entries(CHAINS)) {
+          text += `${name.toUpperCase()}\n`;
+          try {
+            const native = await getNative(chain.rpc, address);
+            const nativeUsd = native * (prices[chain.native.id] || 0);
+            total += nativeUsd;
+            text += `  Native: ${native.toFixed(6)} ${chain.native.symbol} ($${nativeUsd.toFixed(2)})\n`;
+            for (const [sym, token] of Object.entries(chain.tokens)) {
+              const bal = await getToken(chain.rpc, token.address, address, token.decimals);
+              if (bal > 0) {
+                const usd = bal * (prices[token.id] || 0);
+                total += usd;
+                text += `  ${sym}: ${bal.toFixed(4)} ($${usd.toFixed(2)})\n`;
               }
             }
-            const flows = flowSummary(transfers, address);
-            if (flows.length) {
-              text += '  Flow summary:\n';
-              for (const f of flows) text += `    ${f}\n`;
+            const transfers = await getTransfers(chain.blockscout, address);
+            if (transfers.length) {
+              text += '  Recent transfers:\n';
+              for (const t of transfers) {
+                const fromL = getLabel(t.from) || (t.from || '').slice(0, 8);
+                const toL = getLabel(t.to) || (t.to || '').slice(0, 8);
+                text += `    ${fromL} -> ${toL}\n`;
+              }
+              const tops = getTopCounterparties(transfers, address);
+              if (tops.length) {
+                text += '  Top counterparties:\n';
+                for (const c of tops) {
+                  const n = c.label || c.address.slice(0, 10);
+                  text += `    ${n} (${c.count})\n`;
+                }
+              }
+              const flows = flowSummary(transfers, address);
+              if (flows.length) {
+                text += '  Flow summary:\n';
+                for (const f of flows) text += `    ${f}\n`;
+              }
             }
+          } catch (e) {
+            text += `  error: ${e.message}\n`;
           }
-        } catch (e) {
-          text += `  error: ${e.message}\n`;
+          text += '\n';
         }
-        text += '\n';
+        text += `Total USD (approx): $${total.toFixed(2)}\n`;
+        text += '\nPublic sources only. Labels limited to open eth-labels. Transfers limited to free Blockscout windows.';
+        out.textContent = text;
+      } finally {
+        btn.disabled = false;
       }
-      text += `Total USD (approx): $${total.toFixed(2)}\n`;
-      text += '\nAll data from public RPCs, CoinGecko free API, eth-labels, and Blockscout. No proprietary intelligence.';
-      out.textContent = text;
     };
   </script>
 </body>

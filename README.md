@@ -24,7 +24,7 @@ node src/check-balances.js 0xYourAddress
 
 Static site in `web/`. Deployed via the linked Vercel project.
 
-Shows balances (native + common ERC-20s) with USD, attempts open eth-labels, recent Blockscout transfers, top counterparties, and flow summary. Same public sources as the CLI.
+Shows balances (native + common ERC-20s including DAI) with USD on Ethereum, Base, Arbitrum and Optimism. Attempts open eth-labels, recent Blockscout transfers, top counterparties, and flow summary. Same public sources as the CLI.
 
 ## Data sources
 
@@ -36,19 +36,20 @@ Shows balances (native + common ERC-20s) with USD, attempts open eth-labels, rec
 
 ## Current scope
 
-- CLI and site both cover Ethereum, Base, Arbitrum.
-- Native + USDC/USDT/WETH with USD totals.
+- Ethereum, Base, Arbitrum, Optimism.
+- Native + USDC/USDT/DAI/WETH with USD totals.
 - Open label lookup.
 - Recent transfers with labels.
 - Top counterparties by count.
 - Text flow summary (in/out).
+- Improved loading states and layout on the site.
 
 ## Next
 
-- More tokens and chains.
-- Better error handling and loading states.
-- Optional simple visual graph.
+- Optional simple visual graph export.
+- More tokens per chain.
 - Bitcoin/Solana where free public data exists.
+- Persistent local label cache.
 
 Requires Node 18+ for the CLI. The site is static HTML and needs only a browser.
 
