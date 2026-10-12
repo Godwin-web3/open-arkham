@@ -1,39 +1,34 @@
-// Multi-chain native + common ERC-20 balance checker.
-// Uses public RPCs. No API keys.
+// Multi-chain native + common ERC-20 balances with USD values.
+// Public RPCs + CoinGecko free price endpoint. No API keys required.
 
 const CHAINS = {
   ethereum: {
     rpc: 'https://ethereum-rpc.publicnode.com',
-    symbol: 'ETH',
+    native: { symbol: 'ETH', coingecko: 'ethereum' },
     tokens: {
-      USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-      USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-      WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+      USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, coingecko: 'usd-coin' },
+      USDT: { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, coingecko: 'tether' },
+      WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, coingecko: 'weth' },
     },
   },
   base: {
     rpc: 'https://base-rpc.publicnode.com',
-    symbol: 'ETH',
+    native: { symbol: 'ETH', coingecko: 'ethereum' },
     tokens: {
-      USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-      WETH: '0x4200000000000000000000000000000000000006',
+      USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, coingecko: 'usd-coin' },
+      WETH: { address: '0x4200000000000000000000000000000000000006', decimals: 18, coingecko: 'weth' },
     },
   },
   arbitrum: {
     rpc: 'https://arbitrum-one-rpc.publicnode.com',
-    symbol: 'ETH',
+    native: { symbol: 'ETH', coingecko: 'ethereum' },
     tokens: {
-      USDC: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-      USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-      WETH: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
+      USDC: { address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6, coingecko: 'usd-coin' },
+      USDT: { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6, coingecko: 'tether' },
+      WETH: { address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', decimals: 18, coingecko: 'weth' },
     },
   },
 };
-
-const ERC20_ABI = [
-  'function balanceOf(address) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-];
 
 async function rpcCall(rpc, method, params) {
   const body = { jsonrpc: '2.0', method, params, id: 1 };
@@ -52,14 +47,25 @@ async function getNativeBalance(rpc, address) {
   return Number(wei) / 1e18;
 }
 
-async function getTokenBalance(rpc, tokenAddress, holder) {
+async function getTokenBalance(rpc, tokenAddress, holder, decimals) {
   const data = '0x70a08231' + holder.slice(2).padStart(64, '0');
   const result = await rpcCall(rpc, 'eth_call', [{ to: tokenAddress, data }, 'latest']);
   if (!result || result === '0x') return 0;
   const raw = BigInt(result);
-  // Assume 6 or 18 decimals. USDC/USDT usually 6, WETH 18. Hardcoded for common ones.
-  const decimals = tokenAddress.toLowerCase().includes('a0b86991') || tokenAddress.toLowerCase().includes('833589') || tokenAddress.toLowerCase().includes('af88d065') ? 6 : 18;
   return Number(raw) / 10 ** decimals;
+}
+
+async function getPrices() {
+  const ids = 'ethereum,usd-coin,tether,weth';
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
+  const res = await fetch(url);
+  const data = await res.json();
+  return {
+    ethereum: data.ethereum?.usd || 0,
+    'usd-coin': data['usd-coin']?.usd || 1,
+    tether: data.tether?.usd || 1,
+    weth: data.weth?.usd || data.ethereum?.usd || 0,
+  };
 }
 
 async function main() {
@@ -69,20 +75,32 @@ async function main() {
     process.exit(1);
   }
 
+  const prices = await getPrices();
   console.log(`Portfolio for ${address}\n`);
+  let totalUsd = 0;
+
   for (const [name, chain] of Object.entries(CHAINS)) {
     console.log(`\n${name.toUpperCase()}`);
     try {
-      const native = await getNativeBalance(chain.rpc, address);
-      console.log(`  Native: ${native.toFixed(6)} ${chain.symbol}`);
+      const nativeBal = await getNativeBalance(chain.rpc, address);
+      const nativeUsd = nativeBal * prices[chain.native.coingecko];
+      totalUsd += nativeUsd;
+      console.log(`  Native: ${nativeBal.toFixed(6)} ${chain.native.symbol}  ($${nativeUsd.toFixed(2)})`);
+
       for (const [symbol, token] of Object.entries(chain.tokens)) {
-        const bal = await getTokenBalance(chain.rpc, token, address);
-        if (bal > 0) console.log(`  ${symbol}: ${bal.toFixed(4)}`);
+        const bal = await getTokenBalance(chain.rpc, token.address, address, token.decimals);
+        if (bal > 0) {
+          const usd = bal * (prices[token.coingecko] || 0);
+          totalUsd += usd;
+          console.log(`  ${symbol}: ${bal.toFixed(4)}  ($${usd.toFixed(2)})`);
+        }
       }
     } catch (e) {
       console.log(`  error: ${e.message}`);
     }
   }
+
+  console.log(`\nTotal USD (approx): $${totalUsd.toFixed(2)}`);
 }
 
 main();
