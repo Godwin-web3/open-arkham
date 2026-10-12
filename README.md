@@ -14,34 +14,32 @@ A portfolio view of any address or set of addresses across chains. Holdings, USD
 
 Not a clone of Arkham's Ultra entity engine. Public sources cover known exchange wallets, sanctioned addresses, major protocols, and some high-profile individuals. They do not cover most deposit addresses or deep off-chain linking.
 
-## Data sources
-
-- Balances: public RPCs via eth_getBalance and ERC-20 balanceOf.
-- Prices: CoinGecko free endpoint.
-- Labels: eth-labels + wallet-attribution public JSON + local fallback.
-- Transfers: public RPC eth_getLogs, with Blockscout free API fallback.
-- Counterparties and flows: derived from the same transfer list.
-
-## Current scope
-
-- Multi-chain balances with USD values.
-- Open label lookup from two public datasets.
-- Recent transfers (RPC + Blockscout fallback) with labels on from/to.
-- Top counterparties by transfer count with labels.
-- Basic text flow summary of in/out connections.
-
-## Next
-
-- More token coverage.
-- Solana and Bitcoin support.
-- Optional HTML graph export.
-
-## Run
+## CLI
 
 ```bash
 node src/check-balances.js 0xYourAddress
 ```
 
-Requires Node 18+.
+## Site
 
-Transfers try the free RPC first. If empty or limited, Blockscout public endpoints supply recent token transfers. Labels appear only for addresses in the open datasets.
+A static skeleton lives in `web/index.html`. Open it in a browser. It calls the same public RPCs for native balances. Full labels, tokens, and transfers can be ported client-side where CORS allows, or served from a thin backend.
+
+## Data sources
+
+- Balances: public RPCs.
+- Prices: CoinGecko free endpoint.
+- Labels: eth-labels + wallet-attribution.
+- Transfers: public RPC logs + Blockscout free API.
+
+## Current scope
+
+- CLI with balances, USD, labels, transfers, counterparties, flow summary.
+- Basic static web skeleton for native balances.
+
+## Next
+
+- Port the rest of the logic to the site (or a simple backend).
+- Deploy the static files.
+- More tokens and chains.
+
+Requires Node 18+ for the CLI. The site needs only a browser.
