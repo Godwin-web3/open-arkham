@@ -16,24 +16,24 @@ node src/check-balances.js 0xYourAddress
 
 Static files in `web/`. Open `web/index.html` in a browser.
 
-Current site shows native balances plus common ERC-20s on Ethereum and Base, and a local open label if the address matches. Same public RPC calls as the CLI. Full remote labels and transfers can be added where CORS permits.
+The site now shows native and common token balances on Ethereum and Base with USD values from CoinGecko free endpoint, plus a local open label if the address matches. Same public sources as the CLI.
 
 ## Data sources
 
 - Balances: public RPCs.
-- Prices: CoinGecko (CLI).
+- Prices: CoinGecko free endpoint (CLI and site).
 - Labels: open datasets (CLI loads remote; site uses local subset).
 - Transfers: RPC + Blockscout (CLI).
 
 ## Current scope
 
-- CLI: balances, USD, labels, transfers, counterparties, flow summary.
-- Site: native + token balances, local labels.
+- CLI: full balances, USD, labels, transfers, counterparties, flow summary.
+- Site: native + token balances with USD, local labels.
 
 ## Next
 
-- Port remote label fetch and transfers to the site where CORS allows.
-- Deploy static site.
+- Port remote labels and transfers to the site where CORS allows.
+- Deploy the static site.
 - More chains and tokens.
 
 Requires Node 18+ for CLI. Site needs only a browser.

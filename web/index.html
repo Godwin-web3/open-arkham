@@ -12,7 +12,7 @@
 </head>
 <body>
   <h1>Open Arkham</h1>
-  <p>Free portfolio view from public RPCs and open labels. No proprietary data.</p>
+  <p>Free portfolio view from public RPCs, CoinGecko, and open labels. No proprietary data.</p>
   <input id="addr" placeholder="0x address" />
   <button onclick="run()">Check</button>
   <pre id="out">Enter an address.</pre>
@@ -20,17 +20,17 @@
     const CHAINS = {
       ethereum: {
         rpc: 'https://ethereum-rpc.publicnode.com',
-        native: 'ETH',
+        native: { symbol: 'ETH', id: 'ethereum' },
         tokens: {
-          USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-          WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+          USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, id: 'usd-coin' },
+          WETH: { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', decimals: 18, id: 'weth' },
         },
       },
       base: {
         rpc: 'https://base-rpc.publicnode.com',
-        native: 'ETH',
+        native: { symbol: 'ETH', id: 'ethereum' },
         tokens: {
-          USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6, id: 'usd-coin' },
         },
       },
     };
@@ -56,13 +56,23 @@
       return Number(wei) / 1e18;
     }
 
-    async function getToken(rpcUrl, token, holder) {
+    async function getToken(rpcUrl, token, holder, decimals) {
       const data = '0x70a08231' + holder.slice(2).padStart(64, '0');
       const result = await rpc(rpcUrl, 'eth_call', [{ to: token, data }, 'latest']);
       if (!result || result === '0x') return 0;
       const raw = BigInt(result);
-      const decimals = token.toLowerCase().includes('a0b86991') || token.toLowerCase().includes('833589') ? 6 : 18;
       return Number(raw) / 10 ** decimals;
+    }
+
+    async function getPrices() {
+      const ids = 'ethereum,usd-coin,weth';
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+      const data = await res.json();
+      return {
+        ethereum: data.ethereum?.usd || 0,
+        'usd-coin': data['usd-coin']?.usd || 1,
+        weth: data.weth?.usd || data.ethereum?.usd || 0,
+      };
     }
 
     function getLabel(addr) {
@@ -74,24 +84,33 @@
       const out = document.getElementById('out');
       if (!address.startsWith('0x')) { out.textContent = 'Invalid address'; return; }
       out.textContent = 'Loading...';
+      const prices = await getPrices();
       const label = getLabel(address);
       let text = `Portfolio for ${address}${label ? ' (' + label + ')' : ''}\n\n`;
+      let total = 0;
 
       for (const [name, chain] of Object.entries(CHAINS)) {
         text += `${name.toUpperCase()}\n`;
         try {
           const native = await getNative(chain.rpc, address);
-          text += `  Native: ${native.toFixed(6)} ${chain.native}\n`;
+          const nativeUsd = native * prices[chain.native.id];
+          total += nativeUsd;
+          text += `  Native: ${native.toFixed(6)} ${chain.native.symbol} ($${nativeUsd.toFixed(2)})\n`;
           for (const [sym, token] of Object.entries(chain.tokens)) {
-            const bal = await getToken(chain.rpc, token, address);
-            if (bal > 0) text += `  ${sym}: ${bal.toFixed(4)}\n`;
+            const bal = await getToken(chain.rpc, token.address, address, token.decimals);
+            if (bal > 0) {
+              const usd = bal * (prices[token.id] || 0);
+              total += usd;
+              text += `  ${sym}: ${bal.toFixed(4)} ($${usd.toFixed(2)})\n`;
+            }
           }
         } catch (e) {
           text += `  error\n`;
         }
         text += '\n';
       }
-      text += '(Labels from local open set. Transfers and full datasets next.)';
+      text += `Total USD (approx): $${total.toFixed(2)}\n`;
+      text += '(Local labels. Remote datasets and transfers next where CORS allows.)';
       out.textContent = text;
     };
   </script>
