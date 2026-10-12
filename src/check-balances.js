@@ -1,5 +1,5 @@
-// Multi-chain portfolio with USD, labels, transfers, counterparties, and flow summary.
-// Public RPCs + CoinGecko + open labels.
+// Multi-chain portfolio with USD, labels, transfers (RPC + Blockscout), counterparties, flows.
+// Public sources only.
 
 import { initLabels, lookupLabel } from './labels.js';
 import { getRecentTransfers } from './transfers.js';
@@ -105,7 +105,7 @@ async function main() {
         }
       }
 
-      const transfers = await getRecentTransfers(chain.rpc, address);
+      const transfers = await getRecentTransfers(chain.rpc, address, name);
       if (transfers.length) {
         console.log('  Recent transfers:');
         for (const t of transfers) {
